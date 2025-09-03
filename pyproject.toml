@@ -1,0 +1,12 @@
+[project]
+name = "data-viewer"
+version = "0.1.0"
+description = "HuggingFace Dataset Viewer with Flask"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "Flask==2.3.3",
+    "pandas==2.3.2",
+    "Werkzeug==2.3.7",
+    "datasets==4.0.0",
+]

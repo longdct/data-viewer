@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}View Data - {{ dataset_name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>{{ dataset_name }}</h2>
+            <div>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-primary me-2">Load New Dataset</a>
+                <a href="{{ url_for('clear_data') }}" class="btn btn-outline-danger">Clear Data</a>
+            </div>
+        </div>
+
+        <!-- Column Controls and Filtering -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <!-- Column Visibility Controls -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#columnControls" aria-expanded="false" aria-controls="columnControls">
+                                Column Visibility Controls
+                            </button>
+                        </h6>
+                    </div>
+                    <div class="collapse" id="columnControls">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        {% for column in all_columns %}
+                                        <div class="form-check">
+                                            <input class="form-check-input column-checkbox" type="checkbox" 
+                                                   id="col-{{ loop.index }}" value="{{ column }}" 
+                                                   {% if column not in hidden_columns %}checked{% endif %}>
+                                            <label class="form-check-label" for="col-{{ loop.index }}">
+                                                {{ column }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllColumns()">Select All</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllColumns()">Deselect All</button>
+                                        <button type="button" class="btn btn-sm btn-success" onclick="applyColumnVisibility()">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtering Controls -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#filterControls" aria-expanded="false" aria-controls="filterControls">
+                                Filter Data (WHERE clause)
+                            </button>
+                        </h6>
+                    </div>
+                    <div class="collapse" id="filterControls">
+                        <div class="card-body">
+                            <form id="filterForm" class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="filter-column" class="form-label">Column:</label>
+                                    <select class="form-select" id="filter-column" name="filter_column">
+                                        <option value="">Select column...</option>
+                                        {% for column in all_columns %}
+                                        <option value="{{ column }}" {% if column == filter_column %}selected{% endif %}>{{ column }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="filter-value" class="form-label">Value:</label>
+                                    <input type="text" class="form-control" id="filter-value" name="filter_value" 
+                                           value="{{ filter_value }}" placeholder="Enter value to filter by...">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-primary" onclick="applyFilter()">Apply Filter</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="clearFilter()">Clear Filter</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination Controls Top -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="pagination-info">
+                    <strong>Showing {{ start_row }}-{{ end_row }} of {{ total_rows }} rows</strong>
+                    {% if filter_column and filter_value %}
+                        <br><small class="text-muted">Filtered from {{ original_total_rows }} total rows where {{ filter_column }} contains "{{ filter_value }}"</small>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex justify-content-end align-items-center">
+                    <label for="per-page" class="form-label me-2 mb-0">Rows per page:</label>
+                    <select id="per-page" class="form-select form-select-sm" style="width: auto;" onchange="changePerPage(this.value)">
+                        <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                        <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                        <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="table-container">
+            {{ table_html|safe }}
+        </div>
+
+        <!-- Pagination Controls Bottom -->
+        {% if total_pages > 1 %}
+        <div class="d-flex justify-content-center mt-4">
+            <nav aria-label="Page navigation">
+                <ul class="pagination">
+                    <!-- First Page -->
+                    {% if page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('view_data', page=1, per_page=per_page) }}">First</a>
+                    </li>
+                    {% endif %}
+
+                    <!-- Previous Page -->
+                    {% if page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('view_data', page=page-1, per_page=per_page) }}">Previous</a>
+                    </li>
+                    {% endif %}
+
+                    <!-- Page Numbers -->
+                    {% set start_page = [1, page - 2]|max %}
+                    {% set end_page = [total_pages, page + 2]|min %}
+                    
+                    {% if start_page > 1 %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                    {% endif %}
+
+                    {% for p in range(start_page, end_page + 1) %}
+                    <li class="page-item {% if p == page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('view_data', page=p, per_page=per_page) }}">{{ p }}</a>
+                    </li>
+                    {% endfor %}
+
+                    {% if end_page < total_pages %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                    {% endif %}
+
+                    <!-- Next Page -->
+                    {% if page < total_pages %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('view_data', page=page+1, per_page=per_page) }}">Next</a>
+                    </li>
+                    {% endif %}
+
+                    <!-- Last Page -->
+                    {% if page < total_pages %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('view_data', page=total_pages, per_page=per_page) }}">Last</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        <!-- Page Info -->
+        <div class="text-center mt-3 text-muted">
+            Page {{ page }} of {{ total_pages }}
+        </div>
+    </div>
+</div>
+
+<script>
+function changePerPage(perPage) {
+    const url = new URL(window.location);
+    url.searchParams.set('page', '1');
+    url.searchParams.set('per_page', perPage);
+    window.location.href = url.toString();
+}
+
+function selectAllColumns() {
+    document.querySelectorAll('.column-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+}
+
+function deselectAllColumns() {
+    document.querySelectorAll('.column-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+function applyColumnVisibility() {
+    const url = new URL(window.location);
+    
+    // Remove existing hidden_columns parameters
+    url.searchParams.delete('hidden_columns');
+    
+    // Add hidden columns to URL
+    const hiddenColumns = [];
+    document.querySelectorAll('.column-checkbox').forEach(checkbox => {
+        if (!checkbox.checked) {
+            hiddenColumns.push(checkbox.value);
+        }
+    });
+    
+    hiddenColumns.forEach(column => {
+        url.searchParams.append('hidden_columns', column);
+    });
+    
+    // Reset to page 1 when changing column visibility
+    url.searchParams.set('page', '1');
+    
+    window.location.href = url.toString();
+}
+
+function applyFilter() {
+    const url = new URL(window.location);
+    const filterColumn = document.getElementById('filter-column').value;
+    const filterValue = document.getElementById('filter-value').value;
+    
+    if (filterColumn && filterValue) {
+        url.searchParams.set('filter_column', filterColumn);
+        url.searchParams.set('filter_value', filterValue);
+    } else {
+        url.searchParams.delete('filter_column');
+        url.searchParams.delete('filter_value');
+    }
+    
+    // Reset to page 1 when applying filter
+    url.searchParams.set('page', '1');
+    
+    window.location.href = url.toString();
+}
+
+function clearFilter() {
+    const url = new URL(window.location);
+    url.searchParams.delete('filter_column');
+    url.searchParams.delete('filter_value');
+    url.searchParams.set('page', '1');
+    
+    window.location.href = url.toString();
+}
+
+// Update pagination links to preserve current filters and column visibility
+document.addEventListener('DOMContentLoaded', function() {
+    const currentUrl = new URL(window.location);
+    const hiddenColumns = currentUrl.searchParams.getAll('hidden_columns');
+    const filterColumn = currentUrl.searchParams.get('filter_column');
+    const filterValue = currentUrl.searchParams.get('filter_value');
+    
+    // Update all pagination links to include current parameters
+    document.querySelectorAll('.pagination a').forEach(link => {
+        const linkUrl = new URL(link.href);
+        
+        // Add hidden columns
+        hiddenColumns.forEach(column => {
+            linkUrl.searchParams.append('hidden_columns', column);
+        });
+        
+        // Add filter parameters
+        if (filterColumn) linkUrl.searchParams.set('filter_column', filterColumn);
+        if (filterValue) linkUrl.searchParams.set('filter_value', filterValue);
+        
+        link.href = linkUrl.toString();
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h1 class="text-center mb-4">HuggingFace Dataset Viewer</h1>
+        
+        {% if dataset_name %}
+        <div class="file-info">
+            <h5>Currently Loaded Dataset: {{ dataset_name }}</h5>
+            <p class="mb-2">You can view the data or load a new HuggingFace dataset.</p>
+            <a href="{{ url_for('view_data') }}" class="btn btn-primary me-2">View Data</a>
+            <a href="{{ url_for('clear_data') }}" class="btn btn-secondary">Clear Data</a>
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Load HuggingFace Dataset</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('load_hf_dataset') }}" method="post">
+                    <div class="mb-3">
+                        <label for="dataset_path" class="form-label">Dataset Path <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="dataset_path" name="dataset_path" 
+                               placeholder="e.g., imdb, squad, glue/cola, wikitext/wikitext-2-raw-v1" required>
+                        <div class="form-text">Enter the HuggingFace dataset identifier (required)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="subset_name" class="form-label">Subset Name (Optional)</label>
+                        <input type="text" class="form-control" id="subset_name" name="subset_name" 
+                               placeholder="e.g., cola, sst2, wikitext-2-raw-v1">
+                        <div class="form-text">Leave empty if the dataset has no subsets</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="split_name" class="form-label">Split</label>
+                        <select class="form-select" id="split_name" name="split_name">
+                            <option value="train" selected>train</option>
+                            <option value="test">test</option>
+                            <option value="validation">validation</option>
+                            <option value="dev">dev</option>
+                        </select>
+                        <div class="form-text">Select the dataset split to load</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success">Load Dataset</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h6>Popular Datasets to Try:</h6>
+            <ul>
+                <li><strong>imdb</strong> - Movie reviews sentiment analysis</li>
+                <li><strong>squad</strong> - Reading comprehension dataset</li>
+                <li><strong>glue/cola</strong> - Grammar acceptability classification</li>
+                <li><strong>wikitext/wikitext-2-raw-v1</strong> - Language modeling dataset</li>
+                <li><strong>amazon_reviews_multi/en</strong> - Amazon product reviews</li>
+            </ul>
+            
+            <h6>Features:</h6>
+            <ul>
+                <li>Load datasets directly from HuggingFace Hub</li>
+                <li>Paginated view with 10, 20, or 50 rows per page</li>
+                <li>Navigate through large datasets easily</li>
+                <li>Built with Python/Flask for extensibility</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
