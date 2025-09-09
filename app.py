@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from datasets import load_dataset
 import math
 
@@ -149,6 +149,104 @@ def view_data():
                          hidden_columns=hidden_columns,
                          filter_column=filter_column,
                          filter_value=filter_value)
+
+@app.route('/api/search', methods=['GET'])
+def search_data():
+    """
+    Search API that performs exact matching on a specified field.
+    Usage: GET /api/search?field=column_name&value=search_value&dataset_path=huggingface_dataset
+    Optional parameters: subset_name, split_name (defaults to 'train')
+    Returns: JSON array of matching records
+    """
+    global current_data, current_dataset_name
+    
+    # Get dataset parameters
+    dataset_path = request.args.get('dataset_path', '').strip()
+    subset_name = request.args.get('subset_name', '').strip()
+    split_name = request.args.get('split_name', 'train').strip()
+    
+    # Determine which dataset to use
+    search_data = None
+    dataset_info = None
+    
+    if dataset_path:
+        # Load HuggingFace dataset on-demand
+        try:
+            if subset_name:
+                dataset = load_dataset(dataset_path, subset_name, split=split_name)
+            else:
+                dataset = load_dataset(dataset_path, split=split_name)
+            
+            search_data = dataset.to_pandas()
+            dataset_info = f"{dataset_path}" + (f"/{subset_name}" if subset_name else "") + f" ({split_name})"
+            
+        except Exception as e:
+            return jsonify({
+                'error': 'Failed to load HuggingFace dataset',
+                'message': f'Error loading dataset "{dataset_path}": {str(e)}',
+                'suggestion': 'Please check the dataset path, subset name, and split name. Examples: "imdb", "squad", "glue/cola"'
+            }), 400
+    else:
+        # Use currently loaded dataset
+        if current_data is None:
+            return jsonify({
+                'error': 'No dataset available',
+                'message': 'Please either load a dataset first or provide a dataset_path parameter'
+            }), 400
+        search_data = current_data
+        dataset_info = current_dataset_name
+    
+    # Get search parameters
+    field = request.args.get('field', '').strip()
+    value = request.args.get('value', '').strip()
+    
+    # Validate parameters
+    if not field:
+        return jsonify({
+            'error': 'Missing field parameter',
+            'message': 'Please specify a field to search in using the "field" parameter'
+        }), 400
+    
+    if not value:
+        return jsonify({
+            'error': 'Missing value parameter',
+            'message': 'Please specify a value to search for using the "value" parameter'
+        }), 400
+    
+    # Check if field exists in dataset
+    if field not in search_data.columns:
+        return jsonify({
+            'error': 'Field not found',
+            'message': f'Field "{field}" does not exist in the dataset',
+            'available_fields': list(search_data.columns),
+            'dataset': dataset_info
+        }), 400
+    
+    try:
+        # Perform exact matching
+        # Convert both the column and search value to string for exact comparison
+        # This handles different data types consistently
+        mask = search_data[field].astype(str) == value
+        matching_records = search_data[mask]
+        
+        # Convert to list of dictionaries for JSON response
+        results = matching_records.to_dict('records')
+        
+        return jsonify({
+            'success': True,
+            'dataset': dataset_info,
+            'field': field,
+            'value': value,
+            'count': len(results),
+            'results': results
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Search failed',
+            'message': f'An error occurred while searching: {str(e)}',
+            'dataset': dataset_info
+        }), 500
 
 @app.route('/clear')
 def clear_data():
