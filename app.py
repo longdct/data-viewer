@@ -150,20 +150,53 @@ def view_data():
                          filter_column=filter_column,
                          filter_value=filter_value)
 
-@app.route('/api/search', methods=['GET'])
+@app.route('/api/search', methods=['GET', 'POST'])
 def search_data():
     """
     Search API that performs exact matching on a specified field.
-    Usage: GET /api/search?field=column_name&value=search_value&dataset_path=huggingface_dataset
-    Optional parameters: subset_name, split_name (defaults to 'train')
+    
+    GET Usage: GET /api/search?field=column_name&value=search_value&dataset_path=huggingface_dataset
+    POST Usage: POST /api/search with JSON body containing field, value, dataset_path, etc.
+    
+    Parameters:
+    - field: Column name to search in (required)
+    - value: Value to search for (required)
+    - dataset_path: HuggingFace dataset path (optional)
+    - subset_name: Dataset subset name (optional)
+    - split_name: Dataset split (defaults to 'train')
+    
     Returns: JSON array of matching records
     """
     global current_data, current_dataset_name
     
-    # Get dataset parameters
-    dataset_path = request.args.get('dataset_path', '').strip()
-    subset_name = request.args.get('subset_name', '').strip()
-    split_name = request.args.get('split_name', 'train').strip()
+    # Get parameters based on request method
+    if request.method == 'POST':
+        # For POST requests, get parameters from JSON body
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({
+                    'error': 'Invalid JSON',
+                    'message': 'POST request must contain valid JSON in the request body'
+                }), 400
+            
+            dataset_path = data.get('dataset_path', '').strip()
+            subset_name = data.get('subset_name', '').strip()
+            split_name = data.get('split_name', 'train').strip()
+            field = data.get('field', '').strip()
+            value = data.get('value', '').strip()
+        except Exception as e:
+            return jsonify({
+                'error': 'Invalid request format',
+                'message': f'Error parsing JSON: {str(e)}'
+            }), 400
+    else:
+        # For GET requests, get parameters from query string
+        dataset_path = request.args.get('dataset_path', '').strip()
+        subset_name = request.args.get('subset_name', '').strip()
+        split_name = request.args.get('split_name', 'train').strip()
+        field = request.args.get('field', '').strip()
+        value = request.args.get('value', '').strip()
     
     # Determine which dataset to use
     search_data = None
@@ -195,10 +228,6 @@ def search_data():
             }), 400
         search_data = current_data
         dataset_info = current_dataset_name
-    
-    # Get search parameters
-    field = request.args.get('field', '').strip()
-    value = request.args.get('value', '').strip()
     
     # Validate parameters
     if not field:
